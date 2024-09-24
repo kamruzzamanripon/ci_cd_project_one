@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      args:
+        user: developer
+        uid: 1000
+      context: .
+      dockerfile: Dockerfile
+      target: local_dev
+    image: app
+    container_name: laravel-app
+    restart: unless-stopped 
+    volumes:
+      - .:/var/www
+      - node_modules:/var/www/node_modules
+    environment:
+      VIRTUAL_HOST: laravel.test
+    ports:
+       - 8000:8000
+       - 5173:5173
+    depends_on:
+      - db
+    networks:
+      - laravel  
+    entrypoint: ["sh", "./docker-compose/docker-entrypoint.sh"]
+
+  ####################################################################################################
+# DATABASE (MySQL)
+####################################################################################################
+  db:
+    image: mysql:8.0
+    container_name: mysql-risix-laravel
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - ./docker-compose/mysql/data:/var/lib/mysql
+      - ./docker-compose/mysql/logs:/var/log/mysql
+      - ./docker-compose/mysql/ql:/docker-entrypoint-initdb.d
+    networks:
+      - laravel 
+
+####################################################################################################
+# Nginx
+####################################################################################################      
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-rifive-laravel
+    restart: unless-stopped
+    ports:
+      - 8090:80
+    volumes:
+      - ./:/var/www
+      - ./docker-compose/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./docker-compose/nginx/phpmyadmin.conf:/etc/nginx/conf.d/phpmyadmin.conf
+    networks:
+      - laravel
+         
+
+####################################################################################################
+# phpMyAdmin
+####################################################################################################      
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin-rifive-laravel
+    ports:
+        - 8080:80
+    links:
+        - db
+    restart: unless-stopped
+    environment:
+        PMA_HOST: db
+        #PMA_USER: ${DB_USERNAME}
+        #PMA_PASSWORD: ${DB_PASSWORD}
+        PMA_PORT: 3306
+        PMA_ARBITRARY: 1
+    networks:
+        - laravel             
+
+volumes:
+  node_modules:
+
+networks:
+  laravel:
+    driver: bridge  
